@@ -1627,26 +1627,22 @@ void CvCascadeBoost::update_weights(CvBoostTree* tree)
     }
 }
 
-inline float CvCascadeBoost_CalculateLoss(float hitRate, float falseAlarm, int numTrees)
+inline float CvCascadeBoost_CalculateLoss(float hitRate, float falseAlarm, int numTrees, double speedLossWeight)
 {
-    const double treeCost = 20;
-    const double precisionBias = 1.07;
-
     if (hitRate >= 0.9995f) {
         hitRate = 0.9995f;
     }
-
-    double loss = falseAlarm * pow(precisionBias, log(numTrees) + .75);
-
-    if (loss >= 0.9f) {
+    if (falseAlarm >= 0.9f) {
         return (float)INT_MAX;
     }
 
     // calculate equivalent multistage falseAlarm rate with about 77,9% hitrate 
     double exponent = -0.25 / log(hitRate);
-    loss = pow(loss, exponent) * pow(treeCost, sqrt(numTrees + 1));
+    double accLoss = pow(falseAlarm, exponent);
 
-    return (float)loss;
+    double speedLoss = 0.05 / (1 - falseAlarm) * numTrees;
+
+    return (float)(accLoss + speedLossWeight * speedLoss);
 }
 
 bool CvCascadeBoost::isErrDesired()
@@ -1692,7 +1688,7 @@ bool CvCascadeBoost::isErrDesired()
             }
         }
         float falseAlarm = ((float)numFalse) / ((float)numNeg);
-        float loss = CvCascadeBoost_CalculateLoss(hitRate, falseAlarm, weak->total);
+        float loss = CvCascadeBoost_CalculateLoss(hitRate, falseAlarm, weak->total, -log(maxFalseAlarm));
 
         if (loss < minLoss) {
             minLoss = loss;
