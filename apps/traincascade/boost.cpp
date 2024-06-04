@@ -1636,13 +1636,17 @@ inline float CvCascadeBoost_CalculateLoss(float hitRate, float falseAlarm, int n
         return (float)INT_MAX;
     }
 
-    // calculate equivalent multistage falseAlarm rate with about 77,9% hitrate 
-    double exponent = -0.25 / log(hitRate);
-    double accLoss = pow(falseAlarm, exponent);
+    constexpr double accExponentScaling = 1.0 / 64;
+    double exponent = accExponentScaling / log(hitRate);
 
-    double speedLoss = 0.05 / (1 - falseAlarm) * numTrees;
+    constexpr double accLossScaling = -1.0;
+    constexpr double speedScaling = 1.0 / 3;
 
-    return (float)(accLoss + speedLossWeight * speedLoss);
+    // calculate inverse of equivalent multistage falseAlarm rate with about exp(-1/64) ~ 99% recall 
+    double accLoss = accLossScaling * pow(falseAlarm, exponent);
+    double speedLoss = speedScaling / (1 - falseAlarm) * (numTrees + 1);
+
+    return (float)((1 - speedLossWeight) * accLoss + speedLossWeight * speedLoss);
 }
 
 bool CvCascadeBoost::isErrDesired()
@@ -1688,7 +1692,7 @@ bool CvCascadeBoost::isErrDesired()
             }
         }
         float falseAlarm = ((float)numFalse) / ((float)numNeg);
-        float loss = CvCascadeBoost_CalculateLoss(hitRate, falseAlarm, weak->total, -log(maxFalseAlarm));
+        float loss = CvCascadeBoost_CalculateLoss(hitRate, falseAlarm, weak->total, 1 - maxFalseAlarm);
 
         if (loss < minLoss) {
             minLoss = loss;
