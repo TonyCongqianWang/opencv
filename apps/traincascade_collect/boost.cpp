@@ -557,7 +557,8 @@ void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_sample
         int cache_idx = si % cache_size;
         if (cache_idx == 0) {
             cout << si << "/" << n_samples << endl;
-            parallel_for_(Range(0, cache_size),
+            int rangeEndIdx = min(cache_size, n_samples - si)
+            parallel_for_(Range(0, rangeEndIdx),
                 SamplewiseFeatureValOnlyPrecalc(_featureEvaluator, &valCache, n_features, si));
             cout << "preCalc done" << endl;
         }
