@@ -1332,6 +1332,9 @@ bool CvCascadeBoost::train(const CvFeatureEvaluator* _featureEvaluator,
     cout << "|  N |    HR   |    FA   |        LOSS   |" << endl;
     cout << "+----+---------+---------+---------------+" << endl;
 
+    float bestLoss = (float)INT_MAX;
+    int bestCount = 0;
+
     do
     {
         CvCascadeBoostTree* tree = new CvCascadeBoostTree;
@@ -1345,7 +1348,22 @@ bool CvCascadeBoost::train(const CvFeatureEvaluator* _featureEvaluator,
         trim_weights();
         if (cvCountNonZero(subsample_mask) == 0)
             break;
-    } while (!isErrDesired() && (weak->total < params.weak_count));
+        float loss = set_best_threshold();
+        if (loss < bestLoss) {
+            bestLoss = loss;
+            bestCount = weak->total;
+        }
+    } while (weak->total < params.weak_count);
+
+    cout << "+----+---------+---------+---------------+" << endl;
+    cout << "+----+---------+---------+---------------+" << endl;
+
+    for (int tree_idx = weak->total - 1; tree_idx >= bestCount; tree_idx--) {
+        CvCascadeBoostTree* tree = NULL;
+        cvSeqPop(weak, &tree);
+        delete tree;
+    }
+    set_best_threshold();
 
     if (weak->total > 0)
     {
@@ -1636,20 +1654,27 @@ inline float CvCascadeBoost_CalculateLoss(float hitRate, float falseAlarm, int n
         return (float)INT_MAX;
     }
 
-    constexpr double accExponentScaling = 1.0 / 64;
+    constexpr double accExponentScaling = -1.0 / 4;
     double exponent = accExponentScaling / log(hitRate);
 
-    constexpr double accLossScaling = -1.0;
-    constexpr double speedScaling = 1.0 / 3;
+    constexpr double accLossScaling = 1.0 / 2;
+    constexpr double speedScaling = 1.0 / 2;
 
-    // calculate inverse of equivalent multistage falseAlarm rate with about exp(-1/64) ~ 99% recall 
-    double accLoss = accLossScaling * pow(falseAlarm, exponent);
+    // calculate log of equivalent multistage falseAlarm rate with about exp(-1/4) ~ 78% recall 
+    double accLoss = accLossScaling * log(falseAlarm) * exponent;
     double speedLoss = speedScaling / (1 - falseAlarm) * (numTrees + 1);
+    double totalLoss = (1 - speedLossWeight) * accLoss + speedLossWeight * speedLoss;
 
-    return (float)((1 - speedLossWeight) * accLoss + speedLossWeight * speedLoss);
+    // cout << "|"; cout.width(15); cout << right << accLoss;
+    // cout << "|"; cout.width(15); cout << right << speedLoss;
+    // cout << "|"; cout.width(15); cout << right << totalLoss;
+    // cout << "|" << endl;
+
+    return (float)totalLoss;
 }
 
-bool CvCascadeBoost::isErrDesired()
+// returns loss of best threshold
+float CvCascadeBoost::set_best_threshold()
 {
     int sCount = data->sample_count;
     int numPos = 0, numNeg = 0;
@@ -1710,7 +1735,7 @@ bool CvCascadeBoost::isErrDesired()
     cout << "+----+---------+---------+---------------+" << endl;
 
     threshold = bestThreshold;
-    return false;
+    return minLoss;
 }
 
 void CvCascadeBoost::write(FileStorage& fs, const Mat& featureMap) const

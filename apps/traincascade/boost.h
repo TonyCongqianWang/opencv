@@ -77,7 +77,8 @@ public:
 protected:
     virtual bool set_params( const CvBoostParams& _params );
     virtual void update_weights( CvBoostTree* tree );
-    virtual bool isErrDesired();
+
+    virtual float set_best_threshold();
 
     float threshold;
     float minHitRate, maxFalseAlarm;
