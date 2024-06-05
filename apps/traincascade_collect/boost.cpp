@@ -521,11 +521,12 @@ CvCascadeBoostTrainData::CvCascadeBoostTrainData(const CvFeatureEvaluator* _feat
 
 struct SamplewiseFeatureValOnlyPrecalc : ParallelLoopBody
 {
-    SamplewiseFeatureValOnlyPrecalc(const CvFeatureEvaluator* _featureEvaluator, Mat* _valCache, int feature_count, int offset)
+    SamplewiseFeatureValOnlyPrecalc(const CvFeatureEvaluator* _featureEvaluator, Mat* _valCache, int _feature_count, int _offset)
     {
         featureEvaluator = _featureEvaluator;
         valCache = _valCache;
-        feature_count = feature_count;
+        feature_count = _feature_count;
+        offset = _offset;
     }
     void operator()(const Range& range) const
     {
@@ -536,6 +537,7 @@ struct SamplewiseFeatureValOnlyPrecalc : ParallelLoopBody
     const CvFeatureEvaluator* featureEvaluator;
     Mat* valCache;
     int feature_count;
+    int offset;
 };
 
 void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_samples, int numPrecalcVal) {
