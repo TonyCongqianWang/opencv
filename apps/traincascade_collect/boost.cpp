@@ -540,8 +540,7 @@ struct SamplewiseFeatureValOnlyPrecalc : ParallelLoopBody
     int offset;
 };
 
-void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_samples, int numPrecalcVal) {
-    int cache_size = numPrecalcVal;
+void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_samples, int cache_size) {
     static int feature_file_idx = 0;
     int n_features = _featureEvaluator->getNumFeatures();
 
@@ -617,7 +616,7 @@ void CvCascadeBoostTrainData::setData(const CvFeatureEvaluator* _featureEvaluato
     numPrecalcIdx = min(cvRound((double)_precalcIdxBufSize * 1048576. /
         ((is_buf_16u ? sizeof(unsigned short) : sizeof(int)) * sample_count)), var_count);
 
-    save_data_to_disk(featureEvaluator, sample_count, numPrecalcVal);
+    save_data_to_disk(featureEvaluator, sample_count, cvRound((double)_precalcValBufSize * 1048576. / (sizeof(float) * sample_count)));
 
     assert(numPrecalcIdx >= 0 && numPrecalcVal >= 0);
 
