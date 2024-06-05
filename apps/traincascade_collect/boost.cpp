@@ -1701,7 +1701,7 @@ inline float CvCascadeBoost_CalculateLoss(float hitRate, float falseAlarm, int n
 
     // calculate inverse of equivalent multistage falseAlarm rate with about exp(-1/64) ~ 99% recall 
     double accLoss = accLossScaling * pow(falseAlarm, exponent);
-    double speedLoss = speedScaling / (1 - falseAlarm) * (numTrees + 1)
+    double speedLoss = speedScaling / (1 - falseAlarm) * (numTrees + 1);
 
     return (float)((1 - speedLossWeight) * accLoss + speedLossWeight * speedLoss);
 }
