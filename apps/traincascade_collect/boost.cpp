@@ -521,7 +521,7 @@ CvCascadeBoostTrainData::CvCascadeBoostTrainData(const CvFeatureEvaluator* _feat
 
 struct SamplewiseFeatureValOnlyPrecalc : ParallelLoopBody
 {
-    SamplewiseFeatureValOnlyPrecalc(const CvFeatureEvaluator* _featureEvaluator, Mat* _valCache, int feature_count)
+    SamplewiseFeatureValOnlyPrecalc(const CvFeatureEvaluator* _featureEvaluator, Mat* _valCache, int feature_count, int offset)
     {
         featureEvaluator = _featureEvaluator;
         valCache = _valCache;
@@ -531,15 +531,15 @@ struct SamplewiseFeatureValOnlyPrecalc : ParallelLoopBody
     {
         for (int si = range.start; si < range.end; si++)
             for (int fi = 0; fi < feature_count; fi++)
-                valCache->at<float>(fi, si) = (*featureEvaluator)(fi, si);
+                valCache->at<float>(fi, si) = (*featureEvaluator)(fi, si + offset);
     }
     const CvFeatureEvaluator* featureEvaluator;
     Mat* valCache;
     int feature_count;
 };
 
-void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_samples) {
-    constexpr int cache_size = 200000;
+void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_samples, int numPrecalcVal) {
+    int cache_size = numPrecalcVal;
     static int feature_file_idx = 0;
     int n_features = _featureEvaluator->getNumFeatures();
 
@@ -555,9 +555,10 @@ void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_sample
     for (int si = 0; si < n_samples; si++) {
         int cache_idx = si % cache_size;
         if (cache_idx == 0) {
-            parallel_for_(Range(si, si + cache_size),
-                SamplewiseFeatureValOnlyPrecalc(_featureEvaluator, &valCache, n_features));
             cout << si << "/" << n_samples << endl;
+            parallel_for_(Range(0, cache_size),
+                SamplewiseFeatureValOnlyPrecalc(_featureEvaluator, &valCache, n_features, si));
+            cout << "preCalc done" << endl;
         }
         outputFile << _featureEvaluator->getCls(si);
         for (int fi = 0; fi < n_features; fi++) {
@@ -606,8 +607,6 @@ void CvCascadeBoostTrainData::setData(const CvFeatureEvaluator* _featureEvaluato
     var_count = var_all = featureEvaluator->getNumFeatures() * featureEvaluator->getFeatureSize();
     sample_count = _numSamples;
 
-    save_data_to_disk(featureEvaluator, sample_count);
-
     is_buf_16u = false;
     if (sample_count < 65536)
         is_buf_16u = true;
@@ -615,6 +614,8 @@ void CvCascadeBoostTrainData::setData(const CvFeatureEvaluator* _featureEvaluato
     numPrecalcVal = min(cvRound((double)_precalcValBufSize * 1048576. / (sizeof(float) * sample_count)), var_count);
     numPrecalcIdx = min(cvRound((double)_precalcIdxBufSize * 1048576. /
         ((is_buf_16u ? sizeof(unsigned short) : sizeof(int)) * sample_count)), var_count);
+
+    save_data_to_disk(featureEvaluator, sample_count, numPrecalcVal);
 
     assert(numPrecalcIdx >= 0 && numPrecalcVal >= 0);
 
@@ -1700,7 +1701,7 @@ inline float CvCascadeBoost_CalculateLoss(float hitRate, float falseAlarm, int n
 
     // calculate inverse of equivalent multistage falseAlarm rate with about exp(-1/64) ~ 99% recall 
     double accLoss = accLossScaling * pow(falseAlarm, exponent);
-    double speedLoss = speedScaling / (1 - falseAlarm) * (numTrees + 1);
+    double speedLoss = speedScaling / (1 - falseAlarm) * (numTrees + 1)
 
     return (float)((1 - speedLossWeight) * accLoss + speedLossWeight * speedLoss);
 }
