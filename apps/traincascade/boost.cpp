@@ -1717,7 +1717,7 @@ float CvCascadeBoost::set_best_threshold()
             }
         }
         float falseAlarm = ((float)numFalse) / ((float)numNeg);
-        float loss = CvCascadeBoost_CalculateLoss(hitRate, falseAlarm, weak->total, 1 - maxFalseAlarm);
+        float loss = CvCascadeBoost_CalculateLoss(hitRate, falseAlarm, weak->total, maxFalseAlarm);
 
         if (loss < minLoss) {
             minLoss = loss;
