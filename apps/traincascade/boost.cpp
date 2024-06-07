@@ -1654,21 +1654,22 @@ inline float CvCascadeBoost_CalculateLoss(float hitRate, float falseAlarm, int n
         return (float)INT_MAX;
     }
 
-    constexpr double accExponentScaling = -1.0 / 4;
-    double exponent = accExponentScaling / log(hitRate);
-
-    constexpr double accLossScaling = 1.0 / 2;
+    constexpr double accLossScaling = -1.5 / 2; //negative loss to reward accuracy
     constexpr double speedScaling = 1.0 / 2;
 
-    // calculate log of equivalent multistage falseAlarm rate with about exp(-1/4) ~ 78% recall 
-    double accLoss = accLossScaling * log(falseAlarm) * exponent;
+    // calculate log of equivalent multistage falseAlarm rate with about exp(-1/4) ~ 78% recall
+    // using exponent 0.7 to give diminishing rewards for extra accuracy
+    constexpr double accExponentScaling = 1.0 / 4;
+    double exponent = accExponentScaling / log(hitRate); // negative number
+    double accLoss = accLossScaling * pow(log(falseAlarm) * exponent, 0.7);
+
     double speedLoss = speedScaling / (1 - falseAlarm) * (numTrees + 1);
     double totalLoss = (1 - speedLossWeight) * accLoss + speedLossWeight * speedLoss;
 
-    // cout << "|"; cout.width(15); cout << right << accLoss;
-    // cout << "|"; cout.width(15); cout << right << speedLoss;
-    // cout << "|"; cout.width(15); cout << right << totalLoss;
-    // cout << "|" << endl;
+    //cout << "|"; cout.width(15); cout << right << accLoss;
+    //cout << "|"; cout.width(15); cout << right << speedLoss;
+    //cout << "|"; cout.width(15); cout << right << totalLoss;
+    //cout << "|" << endl;
 
     return (float)totalLoss;
 }
