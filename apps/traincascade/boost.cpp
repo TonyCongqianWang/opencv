@@ -1334,8 +1334,9 @@ bool CvCascadeBoost::train(const CvFeatureEvaluator* _featureEvaluator,
 
     float bestLoss = (float)INT_MAX;
     int bestCount = 0;
+    int maxTrees = params.weak_count * 2; // Soft limit on numTrees via timeCostLimit
 
-    do
+    for(int numTree = 0; numTree < maxTrees; numTree++)
     {
         CvCascadeBoostTree* tree = new CvCascadeBoostTree;
         if (!tree->train(data, subsample_mask, this))
@@ -1353,7 +1354,7 @@ bool CvCascadeBoost::train(const CvFeatureEvaluator* _featureEvaluator,
             bestLoss = loss;
             bestCount = weak->total;
         }
-    } while (weak->total < params.weak_count);
+    }
 
     cout << "+----+---------+---------+---------------+" << endl;
     cout << "+----+---------+---------+---------------+" << endl;
@@ -1645,7 +1646,7 @@ void CvCascadeBoost::update_weights(CvBoostTree* tree)
     }
 }
 
-inline float CvCascadeBoost_CalculateLoss(float hitRate, float falseAlarm, int numTrees, double speedLossWeight)
+inline float CvCascadeBoost_CalculateLoss(float hitRate, float falseAlarm, int numTrees, double maxFalseAlarmParam, double timeCostLimit)
 {
     if (hitRate >= 0.9995f) {
         hitRate = 0.9995f;
@@ -1654,24 +1655,28 @@ inline float CvCascadeBoost_CalculateLoss(float hitRate, float falseAlarm, int n
         return (float)INT_MAX;
     }
 
-    constexpr double accLossScaling = -2.0 / 4; //negative loss to reward accuracy
-    constexpr double speedScaling = 1.0 / 8;
+    // Stays constant when chaining multiple stages with same precision/recall
+    double accScore = log(falseAlarm) / log(hitRate); 
+    // Time of one stage * expected invocations of stages with binomial series
+    double timeCost = 1 / (1 - falseAlarm) * (numTrees);
 
-    // calculate log of equivalent multistage falseAlarm rate with about exp(-1/4) recall
-    // using exponent < 1 to give diminishing rewards for extra accuracy
-    constexpr double accExponentScaling = 1.0 / 4;
-    double exponent = accExponentScaling / log(hitRate); // negative number
-    double accLoss = accLossScaling * pow(log(falseAlarm) * exponent, 0.65);
+    // TimeCostLimit functions as soft limit to numTrees
+    if (timeCost > timeCostLimit) {
+        return (float)INT_MAX;
+    }
 
-    double speedLoss = speedScaling / (1 - falseAlarm) * (numTrees + 1);
-    double totalLoss = (1 - speedLossWeight) * accLoss + speedLossWeight * speedLoss;
+    // Weighted geometric mean for total loss to encourage reasonable tradeoff and disincentive extreme values.
+    // By default 0.5 maxFalseAlarm should favour more speed by a reasonable amount to allow for easier tuning
+    double constexpr accComponentBias = 1.0;
+    double speedComponentWeight = pow(maxFalseAlarmParam, accComponentBias);
+    double combinedLoss = pow(timeCost, (speedComponentWeight)) / pow(accScore, (1 - speedComponentWeight));
 
     //cout << "|"; cout.width(15); cout << right << accLoss;
     //cout << "|"; cout.width(15); cout << right << speedLoss;
     //cout << "|"; cout.width(15); cout << right << totalLoss;
     //cout << "|" << endl;
 
-    return (float)totalLoss;
+    return (float)combinedLoss;
 }
 
 // returns loss of best threshold
@@ -1695,10 +1700,10 @@ float CvCascadeBoost::set_best_threshold()
     float optHitrate = 0;
     float optFalseAlarm = 1;
 
-    for (int _hitRateTry = 0; _hitRateTry < 30; _hitRateTry++) {
+    for (int _hitRateTry = 0; _hitRateTry < 40; _hitRateTry++) {
         int numFalse = 0, numPosTrue = 0;
 
-        double _minHitRate = 1 - (1 - minHitRate) * pow(0.9, _hitRateTry);
+        double _minHitRate = 1 - (1 - minHitRate) * pow(0.95, _hitRateTry);
 
         int thresholdIdx = (int)((1.0F - _minHitRate) * numPos);
 
@@ -1718,7 +1723,7 @@ float CvCascadeBoost::set_best_threshold()
             }
         }
         float falseAlarm = ((float)numFalse) / ((float)numNeg);
-        float loss = CvCascadeBoost_CalculateLoss(hitRate, falseAlarm, weak->total, maxFalseAlarm);
+        float loss = CvCascadeBoost_CalculateLoss(hitRate, falseAlarm, weak->total, maxFalseAlarm, 2 * params.weak_count);
 
         if (loss < minLoss) {
             minLoss = loss;
