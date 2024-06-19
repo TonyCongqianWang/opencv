@@ -1334,9 +1334,8 @@ bool CvCascadeBoost::train(const CvFeatureEvaluator* _featureEvaluator,
 
     float bestLoss = (float)INT_MAX;
     int bestCount = 0;
-    int maxTrees = params.weak_count * 2; // Soft limit on numTrees via timeCostLimit
 
-    for(int numTree = 0; numTree < maxTrees; numTree++)
+    for(int numTree = 0; numTree < params.weak_count / 10.0; numTree++)
     {
         CvCascadeBoostTree* tree = new CvCascadeBoostTree;
         if (!tree->train(data, subsample_mask, this))
@@ -1671,9 +1670,9 @@ inline float CvCascadeBoost_CalculateLoss(float hitRate, float falseAlarm, int n
     double speedComponentWeight = pow(maxFalseAlarmParam, accComponentBias);
     double combinedLoss = pow(timeCost, (speedComponentWeight)) / pow(accScore, (1 - speedComponentWeight));
 
-    //cout << "|"; cout.width(15); cout << right << accLoss;
-    //cout << "|"; cout.width(15); cout << right << speedLoss;
-    //cout << "|"; cout.width(15); cout << right << totalLoss;
+    //cout << "|"; cout.width(15); cout << right << accScore;
+    //cout << "|"; cout.width(15); cout << right << timeCost;
+    //cout << "|"; cout.width(15); cout << right << combinedLoss;
     //cout << "|" << endl;
 
     return (float)combinedLoss;
@@ -1700,7 +1699,7 @@ float CvCascadeBoost::set_best_threshold()
     float optHitrate = 0;
     float optFalseAlarm = 1;
 
-    for (int _hitRateTry = 0; _hitRateTry < 40; _hitRateTry++) {
+    for (int _hitRateTry = 0; _hitRateTry < 60; _hitRateTry++) {
         int numFalse = 0, numPosTrue = 0;
 
         double _minHitRate = 1 - (1 - minHitRate) * pow(0.95, _hitRateTry);
@@ -1723,7 +1722,7 @@ float CvCascadeBoost::set_best_threshold()
             }
         }
         float falseAlarm = ((float)numFalse) / ((float)numNeg);
-        float loss = CvCascadeBoost_CalculateLoss(hitRate, falseAlarm, weak->total, maxFalseAlarm, 2 * params.weak_count);
+        float loss = CvCascadeBoost_CalculateLoss(hitRate, falseAlarm, weak->total, maxFalseAlarm, params.weak_count / 10.0);
 
         if (loss < minLoss) {
             minLoss = loss;
