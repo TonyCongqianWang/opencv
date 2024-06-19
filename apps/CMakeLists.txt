@@ -55,6 +55,7 @@ endmacro()
 
 ocv_add_app(traincascade)
 ocv_add_app(traincascade_collect)
+ocv_add_app(traincascade_validate)
 ocv_add_app(createsamples)
 ocv_add_app(annotation)
 ocv_add_app(visualisation)
