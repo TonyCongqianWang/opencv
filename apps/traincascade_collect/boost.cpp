@@ -554,7 +554,7 @@ void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_sample
     cout << "saving features to " << file_name << endl;
     cout << "progress: " << endl;
     std::vector<int> good_feature_indices;
-    int next_good_feature = -1;
+    std::vector<int>::size_type next_good_feature = -1;
 
     std::ifstream good_features_file("good_features.csv"); // Open the file
     if (good_features_file.is_open()) {
@@ -568,7 +568,7 @@ void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_sample
             std::cout << "Found good_features.csv file: Saving " << good_feature_indices.size() << " features" << std::endl;
             outputFile << ",y";
             next_good_feature = 0;
-            for each (index in good_feature_indices)
+            for (; index < good_feature_indices.size(); index++)
             {
                 outputFile << ",features_" << index;
             }
