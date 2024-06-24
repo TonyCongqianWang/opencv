@@ -1333,10 +1333,10 @@ bool CvCascadeBoost::train(const CvFeatureEvaluator* _featureEvaluator,
   cout << "+----+---------+---------+---------------+" << endl;
 
   float bestLoss = (float)INT_MAX;
-  int minTree = 100;
+  int maxTrees = maxFalseAlarm >= 0.5 ? 100: params.weak_count / 10;
   int bestCount = 0;
 
-  for (int numTree = 0; numTree < params.weak_count / 10.0 || numTree <= minTree; numTree++)
+  for (int numTree = 0; numTree <= maxTrees; numTree++)
   {
     CvCascadeBoostTree* tree = new CvCascadeBoostTree;
     if (!tree->train(data, subsample_mask, this))
@@ -1353,7 +1353,8 @@ bool CvCascadeBoost::train(const CvFeatureEvaluator* _featureEvaluator,
     if (loss < bestLoss) {
       bestLoss = loss;
       bestCount = weak->total;
-      minTree = min(minTree, (int)(2 * bestCount));
+      if(maxFalseAlarm >= 0.5)
+        maxTrees = min(maxTrees, (int)(2 * bestCount));
     }
   }
 
