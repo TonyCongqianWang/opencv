@@ -592,7 +592,7 @@ void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_sample
         outputFile << _featureEvaluator->getCls(si);
         for (int fi = 0; fi < n_features; fi++) {
             if (next_good_feature >= 0) {
-                if(good_feature_indices[next_good_feature] != fi)
+                if (good_feature_indices[next_good_feature] != fi)
                     continue;
                 else
                     next_good_feature++;
