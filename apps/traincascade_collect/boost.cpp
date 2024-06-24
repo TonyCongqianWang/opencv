@@ -541,17 +541,40 @@ struct SamplewiseFeatureValOnlyPrecalc : ParallelLoopBody
 };
 
 void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_samples, int cache_size) {
-    static int feature_file_idx = 0;
+    srand((unsigned int)time(NULL));
+    int feature_file_idx = rand() + n_samples % 10000;
     int n_features = _featureEvaluator->getNumFeatures();
-
     Mat valCache(n_features, cache_size, CV_32FC1);
 
+
     std::stringstream ss;
-    ss << "features" << feature_file_idx << ".txt";
+    ss << "features_" << feature_file_idx << ".txt";
     std::string file_name = ss.str();
     std::ofstream outputFile(file_name);
     cout << "saving features to " << file_name << endl;
     cout << "progress: " << endl;
+    std::vector<int> good_feature_indices;
+    int next_good_feature = -1;
+
+    std::ifstream good_features_file("good_features.csv"); // Open the file
+    if (good_features_file.is_open()) {
+        int index;
+        while (good_features_file >> index) {
+            good_feature_indices.push_back(index);
+        }
+        good_features_file.close();
+        if (!good_feature_indices.empty()) {
+            std::sort(good_feature_indices.begin(), good_feature_indices.end());
+            std::cout << "Found good_features.csv file: Saving " << good_feature_indices.size() << " features" << std::endl;
+            outputFile << ",y";
+            next_good_feature = 0;
+            for each (index in good_feature_indices)
+            {
+                outputFile << ",features_" << index;
+            }
+            outputFile << endl;
+        }
+    }
 
     for (int si = 0; si < n_samples; si++) {
         int cache_idx = si % cache_size;
@@ -562,15 +585,27 @@ void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_sample
                 SamplewiseFeatureValOnlyPrecalc(_featureEvaluator, &valCache, n_features, si));
             cout << "preCalc done" << endl;
         }
+        if (next_good_feature >= 0) {
+            outputFile << si << ",";
+            next_good_feature = 0;
+        }
         outputFile << _featureEvaluator->getCls(si);
         for (int fi = 0; fi < n_features; fi++) {
+            if (next_good_feature >= 0) {
+                if(good_feature_indices[next_good_feature] != fi)
+                    continue;
+                else
+                    next_good_feature++;
+                if (next_good_feature > good_feature_indices.size())
+                    break;
+            }
             float val = valCache.at<float>(fi, cache_idx);
             outputFile << "," << val;
         }
         outputFile << endl;
     }
     outputFile.close();
-    cout << " done" << endl;
+    cout << "saving done" << endl;
 }
 
 void CvCascadeBoostTrainData::setData(const CvFeatureEvaluator* _featureEvaluator,
@@ -1371,51 +1406,11 @@ bool CvCascadeBoost::train(const CvFeatureEvaluator* _featureEvaluator,
     int _precalcValBufSize, int _precalcIdxBufSize,
     const CvCascadeBoostParams& _params)
 {
-    bool isTrained = false;
     CV_Assert(!data);
     clear();
     data = new CvCascadeBoostTrainData(_featureEvaluator, _numSamples,
         _precalcValBufSize, _precalcIdxBufSize, _params);
-
-    CvMemStorage* storage = cvCreateMemStorage();
-    weak = cvCreateSeq(0, sizeof(CvSeq), sizeof(CvBoostTree*), storage);
-    storage = 0;
-
-    set_params(_params);
-    if ((_params.boost_type == LOGIT) || (_params.boost_type == GENTLE))
-        data->do_responses_copy();
-
-    update_weights(0);
-
-    cout << "+----+---------+---------+---------------+" << endl;
-    cout << "|  N |    HR   |    FA   |        LOSS   |" << endl;
-    cout << "+----+---------+---------+---------------+" << endl;
-
-    do
-    {
-        CvCascadeBoostTree* tree = new CvCascadeBoostTree;
-        if (!tree->train(data, subsample_mask, this))
-        {
-            delete tree;
-            break;
-        }
-        cvSeqPush(weak, &tree);
-        update_weights(tree);
-        trim_weights();
-        if (cvCountNonZero(subsample_mask) == 0)
-            break;
-    } while (!isErrDesired() && (weak->total < params.weak_count));
-
-    if (weak->total > 0)
-    {
-        data->is_classifier = true;
-        data->free_train_data();
-        isTrained = true;
-    }
-    else
-        clear();
-
-    return isTrained;
+    return false;
 }
 
 float CvCascadeBoost::predict(int sampleIdx, bool returnSum) const
