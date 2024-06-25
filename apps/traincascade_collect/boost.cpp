@@ -568,7 +568,7 @@ void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_sample
             std::cout << "Found good_features.csv file: Saving " << good_feature_indices.size() << " features" << std::endl;
             outputFile << ",y";
             next_good_feature = 0;
-            for (; index < (int)good_feature_indices.size(); index++)
+            for (index = 0; index < (int)good_feature_indices.size(); index++)
             {
                 outputFile << ",features_" << index;
             }
