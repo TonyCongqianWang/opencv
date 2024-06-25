@@ -570,7 +570,7 @@ void save_data_to_disk(const CvFeatureEvaluator* _featureEvaluator, int n_sample
             next_good_feature = 0;
             for (index = 0; index < (int)good_feature_indices.size(); index++)
             {
-                outputFile << ",features_" << index;
+                outputFile << ",feature_" << index;
             }
             outputFile << endl;
         }
