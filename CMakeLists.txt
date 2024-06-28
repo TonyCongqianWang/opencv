@@ -13,6 +13,11 @@ FATAL: In-source builds are not allowed.
 ")
 endif()
 
+if(DEFINED ENV{CONDA_PREFIX})
+  message("Ignoring conda prefix path: $ENV{CONDA_PREFIX}")
+  list(APPEND CMAKE_IGNORE_PREFIX_PATH $ENV{CONDA_PREFIX})
+endif()
+
 include(cmake/OpenCVMinDepVersions.cmake)
 
 if(CMAKE_SYSTEM_NAME MATCHES WindowsPhone OR CMAKE_SYSTEM_NAME MATCHES WindowsStore)
